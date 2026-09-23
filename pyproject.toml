@@ -1,0 +1,43 @@
+[project]
+name = "bnn-smoother"
+version = "0.1.0"
+description = "Bayesian neural network training via moment propagation and RTS smoothing"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.10.6",
+    "numpy>=2.3.3",
+    "opt-einsum>=3.4.0",    # Only for reproducibility, torch orders multi-operand einsum with it
+    "pandas>=2.3.3",
+    "pyyaml>=6.0.3",
+    "scikit-learn>=1.7.2",
+    "torch>=2.8.0",
+]
+
+[project.optional-dependencies]
+# Gaussian process baseline and the Industrial Benchmark simulator.
+baselines = [
+    "gpytorch>=1.15.2",
+    "industrial-benchmark-python",
+]
+
+[tool.setuptools.packages.find]
+include = ["bnn*", "methods*", "data*", "utils*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+# Maths-convention identifiers are deliberate and repo-wide: weight matrices W,
+# X, Y, Kalman gains K, covariances Sigma_yy / Cw, and so on.  Renaming them to
+# snake_case would obscure the correspondence with the paper's notation.
+ignore = [
+    "N803", "N806",   # X, Y, W, K, Sigma_yy — maths notation, see above
+    "E741",           # `I` (identity), `l` (layer index) — same rationale
+    "N812",           # `torch.nn.functional as F` — universal PyTorch convention
+]
+
+[tool.uv.sources]
+industrial-benchmark-python = { git = "https://github.com/siemens/industrialbenchmark" }

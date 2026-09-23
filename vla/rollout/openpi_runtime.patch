@@ -1,0 +1,23 @@
+diff --git a/src/openpi/models_pytorch/pi0_pytorch.py b/src/openpi/models_pytorch/pi0_pytorch.py
+index ba13a39..6f2f770 100644
+--- a/src/openpi/models_pytorch/pi0_pytorch.py
++++ b/src/openpi/models_pytorch/pi0_pytorch.py
+@@ -1,5 +1,6 @@
+ import logging
+ import math
++import os
+ 
+ import torch
+ from torch import Tensor
+@@ -109,7 +110,10 @@ class PI0Pytorch(nn.Module):
+             self.action_time_mlp_out = nn.Linear(action_expert_config.width, action_expert_config.width)
+ 
+         torch.set_float32_matmul_precision("high")
+-        self.sample_actions = torch.compile(self.sample_actions, mode="max-autotune")
++        if os.getenv("OPENPI_DISABLE_TORCH_COMPILE", "").lower() not in {"1", "true", "yes"}:
++            self.sample_actions = torch.compile(self.sample_actions, mode="max-autotune")
++        else:
++            logging.info("OPENPI_DISABLE_TORCH_COMPILE is set; using eager PyTorch inference.")
+ 
+         # Initialize gradient checkpointing flag
+         self.gradient_checkpointing_enabled = False

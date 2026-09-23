@@ -1,0 +1,73 @@
+# Simulator-rollout environment for the VLA experiment.
+#
+# A SEPARATE uv project on purpose.  OpenPI/LIBERO pin torch 2.7.1 and numpy
+# 1.26.4; bnn-smoothing requires torch >=2.8 and numpy >=2.3.
+#
+# Keeping the pins here means rollouts stay comparable with the archived run
+# and the main environment is untouched.  This project is NOT a workspace
+# member and needs no `exclude` -- nesting is enough for uv to treat it apart.
+#
+# The repo's own bnn/ and methods/ are imported from source at runtime rather
+# than installed as a dependency: they need only torch and numpy, they work
+# fine on 2.7.1.
+#
+# OpenPI and LIBERO are not on PyPI and are not listed below.  Install them
+# from the pinned checkouts named in configs/fig4_vla.yaml, into this
+# environment, after `uv sync --project vla/rollout`.
+
+[project]
+name = "vla-rollout"
+version = "0.1.0"
+description = "LIBERO rollout environment for the VLA adaptation experiment"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "torch==2.7.1",
+    "torchvision==0.22.1",
+    "numpy==1.26.4",
+    "scipy==1.15.3",
+    "mujoco==2.3.7",
+    "robosuite==1.4.1",
+    "transformers==4.53.2",
+    "safetensors==0.5.3",
+    "sentencepiece==0.2.0",
+    "jax==0.5.3",
+    "jaxlib==0.5.3",
+    "flax==0.10.2",
+    "orbax-checkpoint==0.11.13",
+    "ml-collections==1.0.0",
+    "numba==0.61.2",
+    "pillow==11.2.1",
+    "opencv-python==4.11.0.86",
+    "imageio==2.37.0",
+    "einops==0.8.1",
+    "jaxtyping==0.2.36",
+    "beartype==0.19.0",
+    "numpydantic==1.6.9",
+    "etils==1.12.2",
+    "fsspec==2025.3.0",
+    "treescope==0.1.9",
+    "bddl==1.0.1",
+    "easydict==1.13",
+    "gym==0.25.2",
+    "gymnasium==0.29.1",
+    "dm-control==1.0.14",
+    "h5py==3.13.0",
+    "pyyaml==6.0.2",
+    "tqdm==4.67.1",
+    "tyro==0.9.22",
+    "rich==14.0.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+# Same maths-notation exemptions as the parent project.
+ignore = ["N803", "N806", "E741", "N812"]
+
+[tool.ruff.lint.per-file-ignores]
+# Copied verbatim from OpenPI's LIBERO example so it stays diffable against
+# upstream.
+"libero_helpers.py" = ["E501"]

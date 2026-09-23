@@ -1,0 +1,103 @@
+# Figure 3, Table II — online dynamics learning on the Siemens Industrial
+# Benchmark
+#
+# The model learns the transition function of a high-dimensional, genuinely
+# stochastic industrial simulator, one transition at a time.  The state is a
+# 5-step sliding window of 6 observables, giving a 33-D input.
+#
+#   Proposed   kbnn_onestep   full dense weight covariance, one-step smoother
+#   KBNN       wagner_kbnn    per-neuron block covariance, two-step smoother
+#   TAGI       tagi           fully diagonal covariance, local linearization
+#   SGD        sgd            AdamW, single-sample, no uncertainty
+#
+# No GP: an exact GP is infeasible on 33-D input with thousands of points.  All
+# methods use [50, 50] and see the identical stream in the same order.  The
+# simulator needs `uv sync --extra baselines`.
+#
+# COMMON PRIOR, c = 2.0.  The three BNN methods place a zero-mean Gaussian
+# prior of per-weight variance c/n_in, expressed differently by each:
+#
+#   Proposed / KBNN   2 * weight_cov_init_scale / n_in  ->  wcis = c/2 = 1.0
+#   TAGI              factor4Wp / n_in                  ->  factor4Wp = c = 2.0
+#
+# Everything below is tuned per method:
+#
+#   likelihood_noise 0.5   Best NLL, with an interior optimum. Transitions are
+#                          stochastic and heteroskedastic, so 0.0 can diverge.
+#                          1.0 gets even better RMSE.
+#   process_noise 0.001    Inert at this magnitude.
+#   Wagner noise 0.1       Best on both metrics, and the lowest value that runs
+#                          at all due to numerical stability issues.
+#   TAGI sigma_v 1.0       TAGI's default 0.32 is worse here.
+#
+# Usage:
+#   uv run python run_dynamics_experiment.py --config configs/fig3_industrial.yaml
+
+# ── Experiment ────────────────────────────────────────────────────────────────
+seed: 7302519
+device: cpu     # cpu | cuda | auto.  CPU is the reference.
+environment: industrial_benchmark
+n_trials: 20
+n_steps: 5000
+state_window: 5
+test_fraction: 0.2
+n_eval_points: 50
+
+# Give the proposed method and KBNN identical initial weights and covariances.
+share_init: true
+
+# Rollout evaluation
+rollout_horizons: [1, 5, 10, 20]
+n_rollout_trajectories: 20
+
+# ── Methods ───────────────────────────────────────────────────────────────────
+methods:
+
+  - name: kbnn_onestep
+    label: "Proposed"
+    model:
+      hidden_sizes: [50, 50]
+      cov_type: dense
+      activation: relu
+      output_activation: linear
+      weight_prior: he
+      weight_cov_init_scale: 1.0    # shared prior c = 2.0
+      process_noise: 0.001
+      likelihood_noise: 0.5
+      dtype: float32
+
+  - name: wagner_kbnn
+    label: "KBNN"
+    model:
+      hidden_sizes: [50, 50]
+      activation: relu
+      output_activation: linear
+      use_bias: true
+      noise: 0.1                    # MUST stay >= 0.1; see header
+      weight_prior: he
+      weight_cov_init_scale: 1.0    # shared prior c = 2.0
+      normalise: false
+      dtype: float32
+
+  - name: tagi
+    label: "TAGI"
+    model:
+      hidden_sizes: [50, 50]
+      activation: relu
+      output_activation: linear
+      sigma_v: 1.0
+      factor4Wp: 2.0                # shared prior c = 2.0
+      factor4Bp: 0.01
+      process_noise: 0.0
+      dtype: float32
+
+  - name: sgd
+    label: "SGD"
+    model:
+      hidden_sizes: [50, 50]
+      activation: relu
+      output_activation: linear
+      lr: 0.001
+      weight_decay: 0.0001
+      grad_clip: 1.0
+      dtype: float32

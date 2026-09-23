@@ -1,0 +1,80 @@
+# Figure 1 — online adaptation on rotating moons (abrupt drift)
+#
+# Binary classification on a two-moons stream that jumps to a new random
+# rotation every 500 samples.  Each method sees one sample at a time, updates
+# once, and is evaluated on a fresh test set drawn at the current angle, so the
+# metrics measure tracking rather than memorisation.
+#
+#   Proposed   kbnn_onestep   full dense weight covariance, one-step smoother
+#   KBNN       wagner_kbnn    per-neuron block covariance, two-step smoother
+#   TAGI       tagi           fully diagonal covariance, local linearization
+#   SGD        sgd            AdamW, single-sample, no uncertainty
+#
+# All four use [20, 20] hidden units and see the identical stream in the
+# identical order.  Runs on CPU in a few minutes; no extra dependencies.
+#
+# Usage:
+#   uv run python run_online_moons_experiment.py --config configs/fig1_moons.yaml
+
+# ── Data ──────────────────────────────────────────────────────────────────────
+stream:
+  drift_type: abrupt           # "abrupt" (the paper) or "smooth"
+  n_total: 2000                # total training samples in the stream
+  noise: 0.2                   # moons crescent noise
+  segment_length: 500          # samples between abrupt angle changes
+  angle_range: 360.0           # new angles drawn from U[0, angle_range)
+  n_test: 300                  # test set size (regenerated per checkpoint)
+
+# ── Experiment ────────────────────────────────────────────────────────────────
+seed: 7302519
+n_trials: 20
+n_eval_points: 60
+
+# Give the proposed method and KBNN identical initial weights and covariances.
+share_init: true
+
+# ── Methods ───────────────────────────────────────────────────────────────────
+methods:
+
+  - name: kbnn_onestep
+    label: "Proposed"
+    model:
+      hidden_sizes: [20, 20]
+      cov_type: dense
+      activation: relu
+      output_activation: sigmoid
+      weight_prior: he
+      weight_cov_init_scale: 1.0
+      process_noise: 0.001
+      likelihood_noise: 0.0
+      dtype: float64
+
+  - name: wagner_kbnn
+    label: "KBNN"
+    model:
+      hidden_sizes: [20, 20]
+      activation: relu
+      output_activation: sigmoid
+      noise: 0.04
+      weight_prior: he
+      weight_cov_init_scale: 1.0
+      dtype: float64
+
+  - name: tagi
+    label: "TAGI"
+    model:
+      hidden_sizes: [20, 20]
+      activation: relu
+      output_activation: sigmoid
+      dtype: float64
+
+  - name: sgd
+    label: "SGD"
+    model:
+      hidden_sizes: [20, 20]
+      activation: relu
+      output_activation: sigmoid
+      lr: 0.003
+      weight_decay: 0.0001
+      grad_clip: 1.0
+      dtype: float64

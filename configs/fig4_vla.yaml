@@ -1,0 +1,144 @@
+# Figure 4 — VLA online adaptation
+#
+# A residual adapter (two hidden layers of 7 ReLU units) corrects the 7-D
+# action of a frozen pi0.5 LIBERO policy as the control frame yaws.  Only the
+# adapter is trained.
+#
+#   Proposed   kbnn_onestep   full dense weight covariance, one-step smoother
+#   KBNN       wagner_kbnn    per-neuron block covariance, two-step smoother
+#   TAGI       tagi           fully diagonal covariance, local linearization
+#   SGD        replay_nn      AdamW on a FIFO-60 replay buffer, batch 16
+#
+# `replay_nn` is not the repository's `sgd` method -- it keeps a replay buffer
+# and trains on minibatches -- but shares its legend label.
+#
+# THE LEARNING PROBLEM IS A KNOWN CORRECTION.  The frame yaws 18 degrees every
+# 60 pairs, and the target is the closed form y = R(theta) a - a computed from
+# the action.  The learner is not given theta, but its labels are exact.  This
+# measures adaptation under supplied labels, not recovery from an unknown
+# frame change.
+#
+# PRIORS ARE NOT SHARED HERE, unlike the dynamics configs.  Effective
+# per-weight prior variance is 0.0100 for Proposed and KBNN, 0.0357 for TAGI.
+# The two baselines were tuned on separate development seeds; the proposed
+# method's configuration was inherited untuned.  The asymmetry favours the
+# baselines.
+#
+# Scoring reads the archived episode outcomes in data/vla/, so a change below
+# moves the training stage but not the success rates until you re-run the
+# rollouts.  See the README.
+#
+# Usage:
+#   uv run python run_vla_experiment.py --config configs/fig4_vla.yaml
+
+seed_source: fixed          # seeds are listed below, not derived from one seed
+device: cpu                 # cpu | cuda | auto.  CPU is the reference.
+
+seeds: [113001, 113002, 113003, 113004, 113005, 113006, 113007, 113008,
+        113009, 113010, 113011, 113012, 113013, 113014, 113015]
+
+# ── Adaptation stream ────────────────────────────────────────────────────────
+train_pairs: 300
+updates_per_arrival: 1
+regime_length: 60
+frame_angles_degrees: [0, 18, 36, 54, 72]
+input_dim: 7
+output_dim: 7
+
+# ── Evaluation (archived; replaying needs the rollout project) ───────────────
+checkpoints: [5, 15, 25, 35, 45, 55, 65, 75, 85, 95, 105, 115, 125, 135,
+              145, 155, 165, 175, 185, 195, 205, 215, 225, 235, 245, 255,
+              265, 275, 285, 295]
+suite: libero_10
+tasks: [0, 1, 2]
+initial_state_indices: [10, 11, 12, 13, 14]
+episodes_per_task: 5
+evaluation_seed: "adaptation_seed + 1000 + episode_index (0..4)"
+replan_steps: 5
+settle_steps: 10
+maximum_action_steps: 520
+image_size: 256
+policy_image_size: 224
+
+# ── Reporting ────────────────────────────────────────────────────────────────
+shading: ci95
+bootstrap:
+  draws: 20000
+  seed: 20260912
+  interval: [0.025, 0.975]
+  unit: paired adaptation seed
+
+# ── Base policy identity (external; never bundled or downloaded here) ────────
+base_checkpoint_sha256: "2b7a341ed263fc4678b7bb4d48e2ea09dfd9453d3b62901cc22e27506ee05416"
+norm_stats_sha256: "c0ee3c1a6ca5f1414d31180af3bc333dca1d78cf912f341943191b393fe68707"
+source_commits:
+  openpi: 190953bc714c99e8f67e3056f716e9005129b7f8
+  libero: f78abd68ee283de9f9be3c8f7e2a9ad60246e95c
+
+# ── Methods ──────────────────────────────────────────────────────────────────
+# `init: matched_proposed_means` gives KBNN the proposed method's weight means
+# at the same seed.  TAGI keeps its native initialisation, which its own prior
+# implies.  Every method zeroes its output layer, so all four start at exactly
+# zero residual.
+methods:
+  - name: kbnn_onestep
+    label: "Proposed"
+    init: own
+    model:
+      hidden_sizes: [7, 7]
+      cov_type: dense
+      activation: relu
+      output_activation: linear
+      use_bias: true
+      weight_prior: scalar
+      weight_init_scale: 0.1
+      weight_cov_init_scale: 0.01
+      process_noise: 0.0001
+      likelihood_noise: 0.0001
+      diagonal_loading: 1.0e-09
+      min_eigval: 1.0e-10
+      dtype: float64
+  - name: wagner_kbnn
+    label: "KBNN"
+    init: matched_proposed_means
+    model:
+      hidden_sizes: [7, 7]
+      activation: relu
+      output_activation: linear
+      use_bias: true
+      noise: 0.001              # 0.0003 scored better but lost PSD mid-stream
+      normalise: false
+      weight_prior: scalar
+      weight_init_scale: 0.035355339059327376   # = 0.1 / sqrt(8)
+      weight_cov_init_scale: 0.01
+      epochs: 1
+      dtype: float64
+  - name: tagi
+    label: "TAGI"
+    init: native
+    model:
+      hidden_sizes: [7, 7]
+      activation: relu
+      output_activation: linear
+      sigma_v: 0.01             # observation variance 1e-4
+      factor4Wp: 0.25           # native default
+      factor4Bp: 0.01
+      process_noise: 0.0        # TAGI has no forgetting mechanism
+      epochs: 1
+      dtype: float64
+  - name: replay_nn
+    label: "SGD"
+    init: own
+    model:
+      hidden_sizes: [7, 7]
+      activation: relu
+      output_activation: linear
+      optimizer: adamw
+      lr: 0.001
+      betas: [0.9, 0.999]
+      eps: 1.0e-08
+      weight_decay: 0.0
+      buffer_size: 60
+      batch_size: 16
+      updates_per_pair: 1
+      dtype: float32
