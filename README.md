@@ -1,17 +1,17 @@
-# bnn-smoothing
+# bnn-smoother
 
 This code accompanies
 
 > O. Wright, H. Jing, Q. Shen, K. Niinuma, Y. Nakahira and J. M. F. Moura,
-> "Full-Covariance Smoothing of Bayesian Neural Networks for Online
-> Adaptation," *IEEE Conference on Decision and Control (CDC)*, 2026.
+> "[Full-Covariance Smoothing of Bayesian Neural Networks for Online
+> Adaptation](https://arxiv.org/html/2609.27244v1)," *IEEE Conference on Decision and Control (CDC)*, 2026.
 
 The proposed method trains Bayesian neural networks via closed-form moment propagation and Rauch–Tung–Striebel smoothing, in one pass over the data.
 Each arriving sample is propagated forward through the network, and a backward smoothing pass updates the weight posterior in closed form.
 
-## Setup
+## Install
 
-We use [uv](https://docs.astral.sh/uv/) for managing this project. With that installed, run
+We use [uv](https://docs.astral.sh/uv/) for managing this project. With uv installed, run
 
 ```bash
 uv sync --extra baselines
@@ -19,30 +19,28 @@ uv sync --extra baselines
 
 to recreate the experiments.
 
-## Reproducing the figures
+## Run
 
 | Paper item | Command |
 |---|---|
-| Figure 1 — rotating moons | `uv run python run_online_moons_experiment.py --config configs/fig1_moons.yaml` |
+| Figure 1 — Rotating moons | `uv run python run_online_moons_experiment.py --config configs/fig1_moons.yaml` |
 | Figure 2, Table I — CartPole | `uv run python run_dynamics_experiment.py --config configs/fig2_cartpole.yaml` |
 | Figure 3, Table II — Industrial Benchmark | `uv run python run_dynamics_experiment.py --config configs/fig3_industrial.yaml` |
 | Figure 4 — VLA online adaptation | `uv run python run_vla_experiment.py --config configs/fig4_vla.yaml` |
 
-Each run writes a timestamped directory under `out/`, which is git-ignored:
+Each run writes a timestamped directory under `out/`:
 
-- `aggregated.json` — the curves behind the figures, averaged across trials
-- `plots/` — the figures, under matplotlib's default style (PNG, and PDF for Figure 4)
-- `config.yaml` — the exact configuration the run used
-- `traces.json`, `rollout.json` — per-trial detail, where applicable
+- `aggregated.json` — aggregate data
+- `plots/` — matplotlib figures
+- `config.yaml` — configuration used
+- `traces.json`, `rollout.json` — per-trial details where applicable
 
 Add `--no-plot` to skip the figures, or `--no-rollout` (dynamics only) to skip
 the multi-step rollout evaluation.
 
 ## Note on the VLA experiment
 
-**The 27,000 episode outcomes are committed**, in `data/vla/episodes.csv.gz`.
-Producing them needs the pi0.5 weights, LIBERO and a GPU, so they are archived
-measurements.  Training retrains all 60 adapters (four methods × 15 seeds) from the committed action streams in about 8 seconds.
+The episode outcomes are archived in `data/vla/episodes.csv.gz`, but they can be reproduced with the pi0.5 weights, LIBERO, and a GPU.
 
 ```bash
 # Stages: train, score, plot, or all (the default)
@@ -55,11 +53,11 @@ uv run python run_vla_experiment.py --config configs/fig4_vla.yaml --verify-prob
 uv run python run_vla_experiment.py --config configs/fig4_vla.yaml --save-adapters
 ```
 
-`--verify-probes` is a check: if you change a prior it is *meant* to fail.
+(`--verify-probes` is a check: if you change config/inputs it is meant to fail.)
 
 ### Fresh rollouts need a second environment
 
-Re-running the policy in LIBERO needs a CUDA GPU, the pi0.5 weights, checkouts of OpenPI and LIBERO, and unlike the rest of the experiments here this will take many GPU-hours to run. It needs its own environment using `torch==2.7.1` and `numpy==1.26.4`, as opposed to our `torch>=2.8` and `numpy>=2.3`.  So it is its own uv project, with its own lock file:
+Re-running the policy in LIBERO needs a CUDA GPU, the pi0.5 weights, checkouts of OpenPI and LIBERO, and unlike the rest of the experiments here this will take many GPU-hours to run. Due to dependency issues (it needs `torch==2.7.1` and `numpy==1.26.4` as opposed to `torch>=2.8` and `numpy>=2.3`), it is its own uv project:
 
 ```bash
 # One-time: build vla/rollout/.venv at the recorded pins
@@ -83,14 +81,13 @@ uv run --project vla/rollout python vla/rollout/evaluate.py \
 ```
 
 `--project` selects the environment and leaves your working directory alone, so
-every command runs from the repository root and `configs/…` and `out/…` mean the
-same thing in each. OpenPI and LIBERO install
-from pinned git checkouts; the pi0.5 weights are never bundled or downloaded.
+every command runs from the repository root. OpenPI and LIBERO install
+from pinned git checkouts.
 
 ## Repository layout
 
-- `bnn/` — The proposed method: moment propagation, covariance storage, the smoother
-- `methods/` — Every method behind one interface, selected by name in a config
+- `bnn/` — The proposed smoother, moment propagation, covariance storage
+- `methods/` — Interface for all methods under consideration
 - `data/` — Stream and environment generators, plus the archived VLA data
 - `configs/` — Config files
 - `utils/` — Helper functions
