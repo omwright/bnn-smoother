@@ -4,7 +4,7 @@ This code accompanies
 
 > O. Wright, H. Jing, Q. Shen, K. Niinuma, Y. Nakahira and J. M. F. Moura,
 > "[Full-Covariance Smoothing of Bayesian Neural Networks for Online
-> Adaptation](https://arxiv.org/html/2609.27244v1)," *IEEE Conference on Decision and Control (CDC)*, 2026.
+> Adaptation](https://arxiv.org/abs/2609.27244v1)," *IEEE Conference on Decision and Control (CDC)*, 2026.
 
 The proposed method trains Bayesian neural networks via closed-form moment propagation and Rauch–Tung–Striebel smoothing, in one pass over the data.
 Each arriving sample is propagated forward through the network, and a backward smoothing pass updates the weight posterior in closed form.
@@ -17,7 +17,7 @@ We use [uv](https://docs.astral.sh/uv/) for managing this project. With uv insta
 uv sync --extra baselines
 ```
 
-to recreate the experiments.
+to install dependencies.
 
 ## Run
 
